@@ -2,7 +2,6 @@ const express = require("express");
 const path = require("path");
 const fs = require("fs");
 const cors = require("cors");
-const morgan = require("morgan");
 const dotenv = require("dotenv");
 
 dotenv.config();
@@ -22,18 +21,18 @@ app.use(cors({
   allowedHeaders: ["Content-Type", "Authorization"]
 }));
 
-if (process.env.NODE_ENV !== "test") {
-  app.use(morgan("dev"));
-}
-
 app.use(express.json({ limit: "15mb" }));
 app.use(express.urlencoded({ extended: true, limit: "15mb" }));
 
-// Static uploads directory
-app.use("/uploads", express.static(path.resolve(__dirname, "../uploads")));
+// Static public/uploads directory if present
+const uploadsDir = path.resolve(__dirname, "../public/images");
+if (fs.existsSync(uploadsDir)) {
+  app.use("/uploads", express.static(uploadsDir));
+  app.use("/images", express.static(uploadsDir));
+}
 
 // Health check endpoint
-app.get("/api/health", (req, res) => {
+app.get(["/api/health", "/health"], (req, res) => {
   res.json({
     status: "healthy",
     samiti: "राणाजी छठ पूजा पार्क समिति (रजि.)",
@@ -41,15 +40,16 @@ app.get("/api/health", (req, res) => {
   });
 });
 
-// API Routes
+// Mount api routes on both /api and /
 app.use("/api", apiRoutes);
+app.use("/", apiRoutes);
 
-// In production, serve the built frontend assets
-const distPath = path.resolve(__dirname, "../../frontend/dist");
-if (fs.existsSync(distPath)) {
+// In local production mode (non-serverless), serve built dist if present
+const distPath = path.resolve(__dirname, "../dist");
+if (fs.existsSync(distPath) && !process.env.VERCEL) {
   app.use(express.static(distPath));
   app.get("*", (req, res, next) => {
-    if (req.path.startsWith("/api") || req.path.startsWith("/uploads")) {
+    if (req.path.startsWith("/api") || req.path.startsWith("/uploads") || req.path.startsWith("/images")) {
       return next();
     }
     res.sendFile(path.join(distPath, "index.html"));

@@ -75,42 +75,26 @@
 
 ### 2. निर्भरताएँ संस्थापित करें (Install Dependencies)
 ```bash
-# Backend निर्भरताएँ
-cd backend
-pnpm install
-
-# Frontend निर्भरताएँ
-cd ../frontend
+npm install
+# या
 pnpm install
 ```
 
-### 3. डेटाबेस इनिशियलाइज़ एवं सीड करें (Seed Database)
+### 3. डेवलपमेंट मोड में चलाएं (Run in Development)
 ```bash
-node backend/src/database/seed.js
-```
-*यह कमांड सभी 66 कार्यकारिणी सदस्यों, 28 आधिकारिक सेटिंग्स, 2026 छठ महापर्व कार्यक्रम, प्रारंभिक गैलरी एवं व्यवस्थापक खाता को SQLite डेटाबेस में स्वतः भर देगा।*
-
-### 4. डेवलपमेंट मोड में चलाएं (Run in Development)
-```bash
-# टर्मिनल 1: Backend API (पोर्ट 5000)
-cd backend
-pnpm run dev
-
-# टर्मिनल 2: Frontend Vite Server (पोर्ट 3000)
-cd frontend
+npm run dev
+# या
 pnpm run dev
 ```
 ब्राउज़र में खोलें: `http://localhost:3000`
 
-### 5. प्रोडक्शन बिल्ड एवं रन (Unified Single Server Production Run)
+### 4. एकीकृत प्रोडक्शन सर्वर चलाएं (Unified Production Run)
 ```bash
-# Frontend का प्रोडक्शन बंडल बनाएं
-cd frontend
-pnpm run build
+# प्रोडक्शन बंडल बनाएं
+npm run build
 
-# Backend सर्वर प्रारंभ करें (यह API तथा बिल्ट Frontend दोनों को एक साथ होस्ट करता है)
-cd ../backend
-pnpm start
+# सर्वर प्रारंभ करें (API एवं वेबसाइट दोनों एक ही सर्वर पर)
+npm start
 ```
 वेबसाइट `http://localhost:5000` पर लाइव उपलब्ध होगी।
 

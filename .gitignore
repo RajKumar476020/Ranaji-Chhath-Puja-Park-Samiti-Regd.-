@@ -5,6 +5,7 @@ backend/node_modules/
 .pnpm-store/
 
 # Build artifacts
+dist/
 frontend/dist/
 .vercel/
 
