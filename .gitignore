@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+frontend/node_modules/
+backend/node_modules/
+.pnpm-store/
+
+# Build artifacts
+frontend/dist/
+.vercel/
+
+# Environment variables
+.env
+.env.local
+.env.production
+
+# SQLite WAL and temp files (commit samiti.sqlite)
+backend/data/*.sqlite-shm
+backend/data/*.sqlite-wal
+data/*.sqlite-shm
+data/*.sqlite-wal
+
+# OS files
+.DS_Store
+Thumbs.db

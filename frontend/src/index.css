@@ -1,0 +1,82 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  body {
+    background-color: #FDFBF7;
+    color: #3E2723;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #FAF5EC;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #e0c064;
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #c2410c;
+  }
+}
+
+/* Devotional Ornate Patterns and Helpers */
+.bg-mandala {
+  background-color: #FDFBF7;
+  background-image: radial-gradient(rgba(212, 175, 55, 0.08) 1px, transparent 0);
+  background-size: 24px 24px;
+}
+
+.bg-devotional-gradient {
+  background: linear-gradient(135deg, #FFFDF9 0%, #FAF5EC 50%, #F5E8D0 100%);
+}
+
+.bg-saffron-gradient {
+  background: linear-gradient(135deg, #FF7A00 0%, #E65100 100%);
+}
+
+.text-gold-gradient {
+  background: linear-gradient(135deg, #D4AF37 0%, #B8860B 50%, #C59B27 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.text-saffron-gradient {
+  background: linear-gradient(135deg, #FF7A00 0%, #D32F2F 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.card-gold-border {
+  border: 1px solid rgba(212, 175, 55, 0.25);
+  box-shadow: 0 4px 20px -2px rgba(212, 175, 55, 0.1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card-gold-border:hover {
+  border-color: rgba(212, 175, 55, 0.6);
+  box-shadow: 0 10px 30px -4px rgba(255, 122, 0, 0.18);
+  transform: translateY(-3px);
+}
+
+/* Subtle devotional floral border */
+.border-traditional {
+  border-image: linear-gradient(to right, #D4AF37, #FF7A00, #D32F2F, #FF7A00, #D4AF37) 1;
+}
+
+/* Prevent unwanted layout shift in Hindi rendering */
+.hindi-text {
+  font-family: 'Hind', 'Noto Sans Devanagari', sans-serif;
+  line-height: 1.6;
+}
+
