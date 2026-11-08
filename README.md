@@ -4,6 +4,8 @@
 > **लगातार 10 वर्षों से छठी मैया की सेवा में समर्पित**  
 > *Dedicated to the Divine Service of Chhathi Maiya for 10 Consecutive Years*
 
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FRajKumar476020%2FRanaji-Chhath-Puja-Park-Samiti-Regd.-)
+
 ---
 
 ## 📌 परियोजना का संक्षिप्त परिचय (Project Overview)
