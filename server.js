@@ -1,4 +1,6 @@
-const app = require("./api/app");
+import { createRequire } from "module";
+const require = createRequire(import.meta.url);
+const app = require("./server/app.js");
 
 const PORT = process.env.PORT || 5000;
 

@@ -1,5 +1,7 @@
-const app = require("./app");
+import { createRequire } from "module";
+const require = createRequire(import.meta.url);
+const app = require("../server/app.js");
 
-module.exports = (req, res) => {
+export default function handler(req, res) {
   return app(req, res);
-};
+}

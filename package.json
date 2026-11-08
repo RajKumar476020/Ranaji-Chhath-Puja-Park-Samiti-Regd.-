@@ -3,12 +3,13 @@
   "version": "1.0.0",
   "description": "राणाजी छठ पूजा पार्क समिति (रजि.) - Official Production Website",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
     "start": "node server.js",
-    "seed": "node api/database/seed.js"
+    "seed": "node server/database/seed.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

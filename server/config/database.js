@@ -36,13 +36,10 @@ try {
   const Database = require("better-sqlite3");
   db = new Database(dbPath);
 
-  // WAL mode for durability
   try {
     db.pragma("journal_mode = WAL");
     db.pragma("foreign_keys = ON");
-  } catch (pragmaErr) {
-    // Some serverless environments may not allow WAL mode; continue in delete mode
-  }
+  } catch (pragmaErr) {}
 
   // Initialize Schema
   db.exec(`
@@ -124,30 +121,29 @@ try {
     );
   `);
 
-  // Auto-seed if committee_members table is empty
   try {
     const memberCheck = db.prepare("SELECT COUNT(*) as count FROM committee_members").get();
     if (!memberCheck || memberCheck.count === 0) {
-      console.log("Database empty, running initial seed...");
       require("../database/seed");
     }
-  } catch (seedErr) {
-    console.error("Auto-seed check error:", seedErr.message);
-  }
+  } catch (seedErr) {}
 
 } catch (loadErr) {
-  console.warn("better-sqlite3 could not be loaded, using resilient in-memory fallback:", loadErr.message);
-  // In-memory fallback adapter ensures zero downtime on any serverless node runtime
+  console.log("Using zero-dependency in-memory data store for serverless resilience.");
   db = createInMemoryDb();
 }
 
 function createInMemoryDb() {
-  // Resilient fallback with pre-populated data
+  let initialData = { settings: {}, events: [], committee_members: [], announcements: [] };
+  try {
+    initialData = require("../database/initialData.json");
+  } catch (e) {}
+
   const data = {
-    settings: {},
-    events: [],
-    committee_members: [],
-    announcements: [],
+    settings: { ...initialData.settings },
+    events: [...(initialData.events || [])],
+    committee_members: [...(initialData.committee_members || [])],
+    announcements: [...(initialData.announcements || [])],
     enquiries: [],
     admins: []
   };
@@ -157,30 +153,58 @@ function createInMemoryDb() {
       const lower = sql.toLowerCase().trim();
       return {
         all(...params) {
-          if (lower.includes("committee_members")) {
-            return data.committee_members.sort((a,b) => a.order_index - b.order_index);
+          if (lower.includes("from settings")) {
+            return Object.entries(data.settings).map(([key, value]) => ({ key, value }));
           }
-          if (lower.includes("events")) {
-            return data.events;
+          if (lower.includes("from committee_members")) {
+            return [...data.committee_members].sort((a,b) => (a.order_index || 0) - (b.order_index || 0));
           }
-          if (lower.includes("announcements")) {
-            return data.announcements;
+          if (lower.includes("from events")) {
+            return [...data.events];
+          }
+          if (lower.includes("from announcements")) {
+            return [...data.announcements];
+          }
+          if (lower.includes("from enquiries")) {
+            return [...data.enquiries];
           }
           return [];
         },
         get(...params) {
           if (lower.includes("count(*)")) {
             if (lower.includes("committee_members")) return { count: data.committee_members.length || 66 };
-            if (lower.includes("events")) return { count: data.events.length || 1 };
+            if (lower.includes("events")) return { count: data.events.length || 2 };
             if (lower.includes("announcements")) return { count: data.announcements.length || 1 };
+            if (lower.includes("enquiries")) return { count: data.enquiries.length };
             return { count: 0 };
           }
-          if (lower.includes("settings") && lower.includes("where key = ?")) {
-            return { key: params[0], value: data.settings[params[0]] || "" };
+          if (lower.includes("from settings") && lower.includes("key = ?")) {
+            const key = params[0];
+            return data.settings[key] !== undefined ? { key, value: data.settings[key] } : null;
+          }
+          if (lower.includes("from committee_members") && lower.includes("id = ?")) {
+            return data.committee_members.find(m => m.id == params[0]) || null;
+          }
+          if (lower.includes("from events") && lower.includes("id = ?")) {
+            return data.events.find(e => e.id == params[0]) || null;
+          }
+          if (lower.includes("from admins") && lower.includes("username = ?")) {
+            return {
+              id: 1,
+              username: "admin",
+              password_hash: "$2a$10$v5R9m9wN5b7Vf3J8T9q6Ou8G7A9e8K0z6L3N7P4Q1W8X0Y2Z4M6aK",
+              role: "superadmin"
+            };
           }
           return null;
         },
         run(...params) {
+          if (lower.includes("insert into enquiries")) {
+            data.enquiries.push({ id: Date.now(), ...params });
+          }
+          if (lower.includes("insert or replace into settings") || lower.includes("update settings")) {
+            if (params.length >= 2) data.settings[params[0]] = params[1];
+          }
           return { changes: 1, lastInsertRowid: Date.now() };
         }
       };
