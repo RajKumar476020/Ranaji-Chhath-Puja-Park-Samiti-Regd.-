@@ -1,3 +1,5 @@
+import { defaultSettings, defaultEvents, defaultCommittee, defaultAnnouncements } from '../data/defaultData';
+
 const getAuthHeaders = () => {
   const token = localStorage.getItem('samiti_admin_token');
   return token ? { Authorization: `Bearer ${token}` } : {};
@@ -6,8 +8,15 @@ const getAuthHeaders = () => {
 export const api = {
   // Settings
   async getSettings() {
-    const res = await fetch('/api/settings');
-    return res.json();
+    try {
+      const res = await fetch('/api/settings');
+      if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+      const data = await res.json();
+      return (data && data.success && data.settings) ? data : { success: true, settings: defaultSettings };
+    } catch (err) {
+      console.warn('Using default settings fallback:', err);
+      return { success: true, settings: defaultSettings };
+    }
   },
   async updateSettings(data) {
     const res = await fetch('/api/settings', {
@@ -20,12 +29,34 @@ export const api = {
 
   // Events
   async getEvents() {
-    const res = await fetch('/api/events');
-    return res.json();
+    try {
+      const res = await fetch('/api/events');
+      if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+      const data = await res.json();
+      if (data && data.success && Array.isArray(data.events) && data.events.length > 0) {
+        return data;
+      }
+      return { success: true, events: defaultEvents };
+    } catch (err) {
+      console.warn('Using default events fallback:', err);
+      return { success: true, events: defaultEvents };
+    }
   },
   async getEvent(id) {
-    const res = await fetch(`/api/events/${id}`);
-    return res.json();
+    try {
+      const res = await fetch(`/api/events/${id}`);
+      if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+      const data = await res.json();
+      if (data && data.success && data.event) {
+        return data;
+      }
+      const match = defaultEvents.find(e => String(e.id) === String(id));
+      return match ? { success: true, event: match } : { success: false, message: 'Event not found' };
+    } catch (err) {
+      console.warn(`Falling back for event ${id}:`, err);
+      const match = defaultEvents.find(e => String(e.id) === String(id));
+      return match ? { success: true, event: match } : { success: false, message: 'Event not found' };
+    }
   },
   async createEvent(data) {
     const res = await fetch('/api/events', {
@@ -53,8 +84,18 @@ export const api = {
 
   // Committee
   async getCommittee() {
-    const res = await fetch('/api/committee');
-    return res.json();
+    try {
+      const res = await fetch('/api/committee');
+      if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+      const data = await res.json();
+      if (data && data.success && Array.isArray(data.members) && data.members.length > 0) {
+        return data;
+      }
+      return { success: true, members: defaultCommittee };
+    } catch (err) {
+      console.warn('Using default committee fallback:', err);
+      return { success: true, members: defaultCommittee };
+    }
   },
   async createMember(data) {
     const res = await fetch('/api/committee', {
@@ -158,8 +199,18 @@ export const api = {
 
   // Announcements
   async getAnnouncements(all = false) {
-    const res = await fetch(`/api/announcements${all ? '?all=true' : ''}`);
-    return res.json();
+    try {
+      const res = await fetch(`/api/announcements${all ? '?all=true' : ''}`);
+      if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+      const data = await res.json();
+      if (data && data.success && Array.isArray(data.announcements) && data.announcements.length > 0) {
+        return data;
+      }
+      return { success: true, announcements: defaultAnnouncements };
+    } catch (err) {
+      console.warn('Using default announcements fallback:', err);
+      return { success: true, announcements: defaultAnnouncements };
+    }
   },
   async createAnnouncement(data) {
     const res = await fetch('/api/announcements', {

@@ -3,27 +3,30 @@ import { Link } from 'react-router-dom';
 import { Calendar, MapPin, Share2, Clock, Check, Sparkles, Sun } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { api } from '../services/api';
+import { defaultEvents } from '../data/defaultData';
 import SEO from '../components/common/SEO';
 import Countdown from '../components/common/Countdown';
 
 const EventsPage = () => {
   const { lang, t, pick } = useLanguage();
-  const [events, setEvents] = useState([]);
+  const [events, setEvents] = useState(defaultEvents);
   const [activeTab, setActiveTab] = useState('upcoming'); // 'upcoming' | 'ongoing' | 'completed' | 'all'
   const [copiedId, setCopiedId] = useState(null);
 
   useEffect(() => {
+    let isMounted = true;
     const fetchEvents = async () => {
       try {
         const res = await api.getEvents();
-        if (res.success && res.events) {
+        if (isMounted && res && res.success && Array.isArray(res.events) && res.events.length > 0) {
           setEvents(res.events);
         }
       } catch (err) {
-        console.error('Failed to load events:', err);
+        console.warn('Failed to load events from API, keeping default data:', err);
       }
     };
     fetchEvents();
+    return () => { isMounted = false; };
   }, []);
 
   const handleShare = async (event) => {

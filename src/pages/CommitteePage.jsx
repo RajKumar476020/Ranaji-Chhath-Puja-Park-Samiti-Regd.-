@@ -2,28 +2,31 @@ import React, { useState, useEffect } from 'react';
 import { Search, Users, Phone, ShieldCheck, Sparkles, User, Award } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { api } from '../services/api';
+import { defaultCommittee } from '../data/defaultData';
 import SEO from '../components/common/SEO';
 
 const CommitteePage = () => {
   const { lang, t, pick } = useLanguage();
-  const [members, setMembers] = useState([]);
+  const [members, setMembers] = useState(defaultCommittee);
   const [searchQuery, setSearchQuery] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    let isMounted = true;
     const fetchMembers = async () => {
       try {
         const res = await api.getCommittee();
-        if (res.success && res.members) {
+        if (isMounted && res && res.success && Array.isArray(res.members) && res.members.length > 0) {
           setMembers(res.members);
         }
       } catch (err) {
-        console.error('Failed to load committee members:', err);
+        console.warn('Failed to load committee members from API, keeping default data:', err);
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     };
     fetchMembers();
+    return () => { isMounted = false; };
   }, []);
 
   const filteredMembers = members.filter((m) => {
@@ -96,7 +99,7 @@ const CommitteePage = () => {
 
       {/* Main Members Grid */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        {loading ? (
+        {loading && members.length === 0 ? (
           <div className="text-center py-20 text-devotional-muted font-hindi">
             {t('common.loading')}
           </div>

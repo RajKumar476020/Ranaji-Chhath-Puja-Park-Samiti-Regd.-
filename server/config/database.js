@@ -1,149 +1,82 @@
 const path = require("path");
 const fs = require("fs");
-const os = require("os");
 
 let db;
-let dbDir;
 
+// In Vercel or when better-sqlite3 is unavailable, use zero-dependency in-memory store
 if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
-  dbDir = os.tmpdir();
-} else {
-  dbDir = process.env.DB_DIR || path.resolve(__dirname, "../../data");
-  if (!fs.existsSync(dbDir)) {
-    try {
-      fs.mkdirSync(dbDir, { recursive: true });
-    } catch (e) {
-      dbDir = os.tmpdir();
-    }
-  }
-}
-
-const dbPath = process.env.DB_PATH || path.join(dbDir, "samiti.sqlite");
-
-// If on Vercel/Lambda and target doesn't exist, copy bundled db if available
-if ((process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) && !fs.existsSync(dbPath)) {
-  const bundledDb = path.resolve(__dirname, "../../data/samiti.sqlite");
-  if (fs.existsSync(bundledDb)) {
-    try {
-      fs.copyFileSync(bundledDb, dbPath);
-    } catch (e) {
-      console.warn("Could not copy bundled db:", e.message);
-    }
-  }
-}
-
-try {
-  const Database = require("better-sqlite3");
-  db = new Database(dbPath);
-
-  try {
-    db.pragma("journal_mode = WAL");
-    db.pragma("foreign_keys = ON");
-  } catch (pragmaErr) {}
-
-  // Initialize Schema
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS settings (
-      key TEXT PRIMARY KEY,
-      value TEXT NOT NULL,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS events (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      title_hi TEXT NOT NULL,
-      title_en TEXT NOT NULL,
-      start_date TEXT NOT NULL,
-      end_date TEXT NOT NULL,
-      location_hi TEXT NOT NULL,
-      location_en TEXT NOT NULL,
-      description_hi TEXT NOT NULL,
-      description_en TEXT NOT NULL,
-      schedule_json TEXT,
-      status TEXT DEFAULT 'upcoming',
-      featured INTEGER DEFAULT 1,
-      image_url TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS committee_members (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name_hi TEXT NOT NULL,
-      name_en TEXT NOT NULL,
-      designation_hi TEXT DEFAULT 'कार्यकारिणी सदस्य',
-      designation_en TEXT DEFAULT 'Executive Committee Member',
-      phone TEXT,
-      order_index INTEGER NOT NULL,
-      is_leadership INTEGER DEFAULT 0,
-      photo_url TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS gallery_items (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      category TEXT DEFAULT 'celebration',
-      image_url TEXT NOT NULL,
-      caption_hi TEXT,
-      caption_en TEXT,
-      order_index INTEGER DEFAULT 0,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS enquiries (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      phone TEXT NOT NULL,
-      email TEXT,
-      subject TEXT NOT NULL,
-      message TEXT NOT NULL,
-      is_read INTEGER DEFAULT 0,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS announcements (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      title_hi TEXT NOT NULL,
-      title_en TEXT NOT NULL,
-      message_hi TEXT NOT NULL,
-      message_en TEXT NOT NULL,
-      is_active INTEGER DEFAULT 1,
-      priority INTEGER DEFAULT 0,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS admins (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      username TEXT UNIQUE NOT NULL,
-      password_hash TEXT NOT NULL,
-      role TEXT DEFAULT 'admin',
-      last_login DATETIME,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-  `);
-
-  try {
-    const memberCheck = db.prepare("SELECT COUNT(*) as count FROM committee_members").get();
-    if (!memberCheck || memberCheck.count === 0) {
-      require("../database/seed");
-    }
-  } catch (seedErr) {}
-
-} catch (loadErr) {
-  console.log("Using zero-dependency in-memory data store for serverless resilience.");
   db = createInMemoryDb();
+} else {
+  try {
+    const Database = require("better-sqlite3");
+    const dbDir = process.env.DB_DIR || path.resolve(__dirname, "../../data");
+    if (!fs.existsSync(dbDir)) {
+      try {
+        fs.mkdirSync(dbDir, { recursive: true });
+      } catch (e) {}
+    }
+    const dbPath = process.env.DB_PATH || path.join(dbDir, "samiti.sqlite");
+    db = new Database(dbPath);
+
+    try {
+      db.pragma("journal_mode = WAL");
+      db.pragma("foreign_keys = ON");
+    } catch (e) {}
+
+    // Verify committee_members has data
+    const check = db.prepare("SELECT COUNT(*) as count FROM committee_members").get();
+    if (!check || check.count === 0) {
+      console.log("Database empty, loading default data...");
+      const initialData = require("../database/initialData.json");
+      // populate from initialData
+      populateFromInitialData(db, initialData);
+    }
+  } catch (err) {
+    console.log("SQLite unavailable, using in-memory store:", err.message);
+    db = createInMemoryDb();
+  }
+}
+
+function populateFromInitialData(sqliteDb, initialData) {
+  try {
+    const insertMember = sqliteDb.prepare(`
+      INSERT OR REPLACE INTO committee_members (id, name_hi, name_en, designation_hi, designation_en, phone, order_index, is_leadership, image_url)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    for (const m of initialData.committee_members) {
+      insertMember.run(m.id, m.name_hi, m.name_en, m.designation_hi, m.designation_en, m.phone || "", m.order_index, m.is_leadership || 0, m.image_url || null);
+    }
+
+    const insertEvent = sqliteDb.prepare(`
+      INSERT OR REPLACE INTO events (id, title_hi, title_en, start_date, end_date, location_hi, location_en, description_hi, description_en, schedule_json, status, featured, image_url)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    for (const ev of initialData.events) {
+      insertEvent.run(ev.id, ev.title_hi, ev.title_en, ev.start_date, ev.end_date, ev.location_hi, ev.location_en, ev.description_hi, ev.description_en, ev.schedule_json, ev.status, ev.featured, ev.image_url);
+    }
+
+    const insertSetting = sqliteDb.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)");
+    for (const [k, v] of Object.entries(initialData.settings)) {
+      insertSetting.run(k, v);
+    }
+  } catch (e) {
+    console.warn("Populate error:", e.message);
+  }
 }
 
 function createInMemoryDb() {
   let initialData = { settings: {}, events: [], committee_members: [], announcements: [] };
   try {
     initialData = require("../database/initialData.json");
-  } catch (e) {}
+  } catch (e) {
+    console.error("Could not load initialData.json:", e);
+  }
 
   const data = {
     settings: { ...initialData.settings },
-    events: [...(initialData.events || [])],
-    committee_members: [...(initialData.committee_members || [])],
-    announcements: [...(initialData.announcements || [])],
+    events: JSON.parse(JSON.stringify(initialData.events || [])),
+    committee_members: JSON.parse(JSON.stringify(initialData.committee_members || [])),
+    announcements: JSON.parse(JSON.stringify(initialData.announcements || [])),
     enquiries: [],
     admins: []
   };
@@ -160,7 +93,7 @@ function createInMemoryDb() {
             return [...data.committee_members].sort((a,b) => (a.order_index || 0) - (b.order_index || 0));
           }
           if (lower.includes("from events")) {
-            return [...data.events];
+            return [...data.events].sort((a,b) => (a.start_date || "").localeCompare(b.start_date || ""));
           }
           if (lower.includes("from announcements")) {
             return [...data.announcements];
@@ -172,11 +105,15 @@ function createInMemoryDb() {
         },
         get(...params) {
           if (lower.includes("count(*)")) {
-            if (lower.includes("committee_members")) return { count: data.committee_members.length || 66 };
-            if (lower.includes("events")) return { count: data.events.length || 2 };
-            if (lower.includes("announcements")) return { count: data.announcements.length || 1 };
+            if (lower.includes("committee_members")) return { count: data.committee_members.length };
+            if (lower.includes("events")) return { count: data.events.length };
+            if (lower.includes("announcements")) return { count: data.announcements.length };
             if (lower.includes("enquiries")) return { count: data.enquiries.length };
             return { count: 0 };
+          }
+          if (lower.includes("max(order_index)")) {
+            const max = data.committee_members.reduce((m, c) => Math.max(m, c.order_index || 0), 0);
+            return { max_idx: max };
           }
           if (lower.includes("from settings") && lower.includes("key = ?")) {
             const key = params[0];
@@ -199,11 +136,68 @@ function createInMemoryDb() {
           return null;
         },
         run(...params) {
+          if (lower.includes("insert into committee_members")) {
+            const newId = (data.committee_members.reduce((m, c) => Math.max(m, c.id || 0), 0) || 0) + 1;
+            const [name_hi, name_en, designation_hi, designation_en, phone, order, is_leadership, image_url] = params;
+            data.committee_members.push({
+              id: newId,
+              name_hi,
+              name_en,
+              designation_hi,
+              designation_en,
+              phone: phone || "",
+              order_index: order || newId,
+              is_leadership: is_leadership ? 1 : 0,
+              image_url: image_url || null
+            });
+            return { changes: 1, lastInsertRowid: newId };
+          }
+          if (lower.includes("update committee_members")) {
+            const id = params[params.length - 1];
+            const member = data.committee_members.find(m => m.id == id);
+            if (member && params.length >= 7) {
+              member.name_hi = params[0] || member.name_hi;
+              member.name_en = params[1] || member.name_en;
+              member.designation_hi = params[2] || member.designation_hi;
+              member.designation_en = params[3] || member.designation_en;
+              member.phone = params[4] !== undefined ? params[4] : member.phone;
+              member.order_index = params[5] || member.order_index;
+              member.is_leadership = params[6] !== undefined ? params[6] : member.is_leadership;
+            }
+            return { changes: 1 };
+          }
+          if (lower.includes("delete from committee_members")) {
+            const id = params[0];
+            data.committee_members = data.committee_members.filter(m => m.id != id);
+            return { changes: 1 };
+          }
+          if (lower.includes("insert into events")) {
+            const newId = (data.events.reduce((m, e) => Math.max(m, e.id || 0), 0) || 0) + 1;
+            const [title_hi, title_en, start_date, end_date, location_hi, location_en, description_hi, description_en, schedule_json, status, featured, image_url] = params;
+            data.events.push({
+              id: newId,
+              title_hi,
+              title_en,
+              start_date,
+              end_date,
+              location_hi,
+              location_en,
+              description_hi,
+              description_en,
+              schedule_json: schedule_json || "[]",
+              status: status || "upcoming",
+              featured: featured || 0,
+              image_url: image_url || null
+            });
+            return { changes: 1, lastInsertRowid: newId };
+          }
           if (lower.includes("insert into enquiries")) {
-            data.enquiries.push({ id: Date.now(), ...params });
+            data.enquiries.push({ id: Date.now(), params });
+            return { changes: 1, lastInsertRowid: Date.now() };
           }
           if (lower.includes("insert or replace into settings") || lower.includes("update settings")) {
             if (params.length >= 2) data.settings[params[0]] = params[1];
+            return { changes: 1 };
           }
           return { changes: 1, lastInsertRowid: Date.now() };
         }
